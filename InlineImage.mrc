@@ -5,7 +5,7 @@ menu @imageHotlink {
 ; Start script if we move the mouse over an image link
 on $^*:HOTLINK:/^(?:((http|https)\x3A\x2F{2}\S+)|(www\.\S+\.\S+))\.(png|gif|jpg|jpeg)$/i:#:{
   var %url = $1  
-  hadd -m ImagePreview URL %url
+  hadd -m ImagePreview Url %url
 
   if ($hotlink(event) == rclick) {
     hotlink -md @imageHotlink
@@ -25,7 +25,7 @@ on $*:HOTLINK:/^(?:((http|https)\x3A\x2F{2}\S+)|(www\.\S+\.\S+))\.(png|gif|jpg|j
 }
 
 alias -l downloadImage {
-  var %url = $hget(ImagePreview,URL)
+  var %url = $hget(ImagePreview,Url)
   if (%url == $null) {
     echo -s URL not saved, aborting
     return
@@ -38,7 +38,7 @@ alias -l downloadImage {
 
   var %fileExt = $regml(UrlFileExt,1)
   var %urlId = $urlget(%url,gf,output. $+ %fileExt,showImage)
-  set -g %UrlId %urlId
+  hadd ImagePreview UrlId %urlId
   ; Show Loading Window
   var %windowLeft = $mouse.cx - 30
   var %windowTop = $mouse.cy - 30
@@ -79,7 +79,7 @@ alias -l showImage {
   var %target = $urlget(%id).target
   var %url = $urlget(%id).url
 
-  ; Grab image position from previous window before we close it
+  ; Grab image position from loading window before we close it
   var %imageTop = $window(@Image).cy
   var %imageLeft = $window(@Image).cx
 
@@ -101,35 +101,49 @@ alias -l showImage {
   var %imageWidth = $pic(%target).width
   var %imageHeight = $pic(%target).height
 
+  ; Max of 640 width or 480 height
+  var %widthRatio = $calc(640 / %imageWidth)
+  var %heightRatio = $calc(480 / %imageHeight)
+  if (%widthRatio < 1 || %heightRatio < 1) {
+    echo -sg Image: %imageWidth %imageHeight  Ratios: %widthRatio %heightRatio
+    %imageWidth = $calc($iif(%widthRatio < %heightRatio,%widthRatio,%heightRatio) * %imageWidth)  
+    %imageHeight = $calc($iif(%widthRatio < %heightRatio,%widthRatio,%heightRatio) * %imageHeight)  
+  }
+
   ; Open Window
   window -padoBfvw0 +d @Image %imageLeft %imageTop %imageWidth %imageHeight
 
   ; Draw image
-  drawpic @Image 0 0 " $+ %target $+ "
+  drawpic -s @Image 0 0 %imageWidth %imageHeight " $+ %target $+ "
 
   ; More than 1 frame?  let's play it!
   var %gifFrames = $pic(%target).frames
   if (%gifFrames > 1) {
-    set -g %GifFrame 1
-    set -g %GifFrames %gifFrames
-    playGif %target $pic(%target).delay
-  }
-}
+    ; Store parameters for Gif drawing
+    hadd ImagePreview GifTarget %target
+    hadd ImagePreview GifFrame 1
+    hadd ImagePreview GifFrames %gifFrames
+    hadd ImagePreview ImageWidth %imageWidth
+    hadd ImagePreview ImageHeight %imageHeight
 
-alias -l playGif {
-  var %target = $1
-  var %delay = $2
-  .timerPlayGif -h 0 %delay drawGifFrame %target
+    .timerPlayGif -h 0 $pick(%target).delay drawGifFrame
+  }
 }
 
 alias -l drawGifFrame {
-  var %target = $1-
+  var %target = $hget(ImagePreview,GifTarget)
+  var %gifFrame = $hget(ImagePreview,GifFrame)
+  var %gifFrames = $hget(ImagePreview,GifFrames)
+  var %imageWidth = $hget(ImagePreview,ImageWidth)
+  var %imageHeight = $hget(ImagePreview,ImageHeight)
 
-  drawpic -co @Image 0 0 %GifFrame " $+ %target $+ "
-  inc %GifFrame
-  if (%GifFrame >= %GifFrames) {
-    set %GifFrame 0
+  drawpic -sco @Image 0 0 %imageWidth %imageHeight %gifFrame " $+ %target $+ "
+
+  inc %gifFrame
+  if (%gifFrame >= %gifFrames || %gifFrame > 100) {
+    set %gifFrame 0
   }
+  hadd ImagePreview GifFrame %gifFrame
 }
 
 menu @Image {
@@ -140,9 +154,9 @@ menu @Image {
 alias -l closeImage {
   ; Stop any download if it's in progress
   .timerImageProgress off
-  var %result = $urlget(%UrlId,c)
-
+  var %urlId = $hget(ImagePreview,UrlId)
+  if (%urlId != $null) %urlId = $urlget(%urlId,c)
   .timerPlayGif off
-  unset %GifFrame
   window -c @Image
+  hfree ImagePreview
 }
