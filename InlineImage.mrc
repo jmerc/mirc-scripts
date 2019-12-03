@@ -105,7 +105,6 @@ alias -l showImage {
   var %widthRatio = $calc(640 / %imageWidth)
   var %heightRatio = $calc(480 / %imageHeight)
   if (%widthRatio < 1 || %heightRatio < 1) {
-    echo -sg Image: %imageWidth %imageHeight  Ratios: %widthRatio %heightRatio
     %imageWidth = $calc($iif(%widthRatio < %heightRatio,%widthRatio,%heightRatio) * %imageWidth)  
     %imageHeight = $calc($iif(%widthRatio < %heightRatio,%widthRatio,%heightRatio) * %imageHeight)  
   }
