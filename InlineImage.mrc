@@ -3,7 +3,7 @@ menu @imageHotlink {
 }
 
 ; Start script if we move the mouse over an image link
-on $^*:HOTLINK:/^(?:((http|https)\x3A\x2F{2}\S+)|(www\.\S+\.\S+))\.(png|gif|jpg|jpeg)$/i:#:{
+on $^*:HOTLINK:/^(?:((http|https)\x3A\x2F{2}\S+)|(www\.\S+\.\S+))\.(png|gif|jpg|jpeg)$/i:*:{
   var %url = $1  
   hadd -m ImagePreview Url %url
 
